@@ -1,0 +1,129 @@
+# Stage 1: mutate base image to make it bootc-compatible
+FROM docker.io/archlinux/archlinux@sha256:03ab8a50889be2ab412771cc88298e282fd28974571d33a612e85d4f27adbd27 AS builder
+
+# Move pacman state from /var -> /usr/lib/sysimage
+RUN <<'EORUN'
+set -euo pipefail
+grep "= */var" "/etc/pacman.conf" | \
+  sed "/= *\/var/s/.*=// ; s/ //" | \
+  while read -r varpath; do
+    newpath="/usr/lib/sysimage/${varpath#/var/}"
+    mkdir -p "$(dirname "${newpath}")"
+    mv -v "${varpath}" "${newpath}"
+  done
+
+sed -i \
+  -e "/= *\/var/ s/^#//" \
+  -e "s@= */var@= /usr/lib/sysimage@g" \
+  -e "/DownloadUser/d" \
+  "/etc/pacman.conf"
+EORUN
+
+# Make system update
+RUN <<'EORUN'
+set -euo pipefail
+pacman -Syu --noconfirm
+pacman -S --clean --noconfirm
+EORUN
+
+# Install packages
+RUN <<'EORUN'
+set -euo pipefail
+pacman -Sy --noconfirm base linux linux-firmware dbus dbus-glib glib2 skopeo dracut ostree shadow btrfs-progs e2fsprogs xfsprogs dosfstools
+pacman -S --clean --noconfirm
+EORUN
+
+# Install bootc from source
+RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root <<'EORUN'
+set -euo pipefail
+pacman -S --noconfirm make git rust go-md2man
+git clone --branch v1.11.0 --depth 1 "https://github.com/bootc-dev/bootc.git" /tmp/bootc
+make -C /tmp/bootc bin install-all
+pacman -Rns --noconfirm make git rust go-md2man
+pacman -S --clean --noconfirm
+EORUN
+
+# Write configs
+RUN <<'EORUN'
+set -euo pipefail
+
+# Enable composefs backend and readonly sysroot via ostree-prepare-root
+# This file must exist before initramfs generation
+mkdir -p /usr/lib/ostree
+cat > "/usr/lib/ostree/prepare-root.conf" <<EOF
+[composefs]
+enabled = true
+[sysroot]
+readonly = true
+EOF
+EORUN
+
+# initramfs
+RUN <<'EORUN'
+set -euo pipefail
+
+# https://github.com/bootc-dev/bootc/issues/1801
+cat > "/usr/lib/dracut/dracut.conf.d/30-bootcrew-fix-bootc-module.conf" <<'EOF'
+systemdsystemconfdir=/etc/systemd/system
+systemdsystemunitdir=/usr/lib/systemd/system
+EOF
+
+cat > "/usr/lib/dracut/dracut.conf.d/30-bootcrew-bootc-container-build.conf" <<'EOF'
+reproducible=yes
+hostonly=no
+compress=zstd
+add_dracutmodules+=" ostree bootc "
+EOF
+
+kver=$(ls /usr/lib/modules/ | grep -v '^\.' | sort -V | tail -n1)
+dracut --force "/usr/lib/modules/${kver}/initramfs.img"
+EORUN
+
+# Final cleanup
+RUN <<'EORUN'
+pacman -Scc --noconfirm
+EORUN
+
+# Mutate file tree to comply to image-based systems
+RUN <<'EORUN'
+set -euo pipefail
+
+# New users should get /var/home
+sed -i "s|^HOME=.*|HOME=/var/home|" "/etc/default/useradd" || true
+
+# Remove top-level dirs that we will recreate via symlinks
+rm -rf /{boot,home,root,usr/local,srv,var,usr/lib/sysimage/log,usr/lib/sysimage/cache/pacman/pkg}
+mkdir -p /{sysroot,boot,usr/lib/ostree,var}
+
+# Symlink layout (mutable bits into /var)
+ln -s sysroot/ostree "/ostree"
+ln -s var/roothome "/root"
+ln -s var/srv "/srv"
+ln -s var/opt "/opt"
+ln -s var/mnt "/mnt"
+ln -s var/home "/home"
+
+# Tmpfiles rules to create the /var subdirs on boot
+mkdir -p "/usr/lib/tmpfiles.d"
+{
+  for dir in opt home srv mnt usrlocal; do
+    echo "d /var/${dir} 0755 root root -"
+  done
+  echo "d /var/roothome 0700 root root -"
+  echo "d /run/media 0755 root root -"
+} > "/usr/lib/tmpfiles.d/bootc-base-dirs.conf"
+
+EORUN
+
+# Stage 2: final OS image
+FROM scratch
+COPY --from=builder / /
+
+# Final sanity check
+RUN bootc container lint
+
+LABEL containers.bootc="1"
+LABEL ostree.bootable="1"
+ENV container=oci
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]
