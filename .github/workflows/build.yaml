@@ -1,0 +1,70 @@
+name: Build Image
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Containerfile.template'
+      - 'base-image.lock'
+      - 'scripts/**'
+      - 'Makefile'
+      - '.github/workflows/build.yaml'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate build version
+        id: version
+        run: |
+          BUILD_DATE=$(date +%Y%m%d)
+          BUILD_NUMBER=${{ github.run_number }}
+          VERSION="${BUILD_DATE}.${BUILD_NUMBER}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version: $VERSION"
+
+      - name: Read base image ref
+        id: base-image
+        run: |
+          BASE_IMAGE_REF=$(head -n1 base-image.lock | tr -d '[:space:]')
+          echo "ref=$BASE_IMAGE_REF" >> "$GITHUB_OUTPUT"
+          echo "Base image: $BASE_IMAGE_REF"
+
+      - name: Generate Containerfile
+        run: |
+          BUILD_VERSION="${{ steps.version.outputs.version }}" \
+          GIT_SHA="${{ github.sha }}" \
+          BASE_IMAGE_REF="${{ steps.base-image.outputs.ref }}" \
+          ./scripts/make-containerfile.sh
+
+      - name: Upload generated Containerfile as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: containerfile-${{ steps.version.outputs.version }}
+          path: Containerfile
+          retention-days: 30
+
+      - name: Build bootc image
+        run: |
+          podman build \
+            -t bootc-arch-base:${{ steps.version.outputs.version }} \
+            -t bootc-arch-base:latest \
+            .
+
+      - name: Inspect image
+        run: |
+          echo "=== Image Tags ==="
+          podman images bootc-arch-base
+          echo ""
+          echo "=== Image Details ==="
+          podman inspect bootc-arch-base:${{ steps.version.outputs.version }} | \
+            jq '.[0] | {
+              Size: .Size,
+              Created: .Created,
+              Labels: .Labels
+            }'

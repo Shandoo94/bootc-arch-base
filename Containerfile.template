@@ -1,5 +1,5 @@
 # Stage 1: mutate base image to make it bootc-compatible
-FROM docker.io/archlinux/archlinux@sha256:03ab8a50889be2ab412771cc88298e282fd28974571d33a612e85d4f27adbd27 AS builder
+FROM TEMPLATE_BASE_IMAGE_REF AS builder
 
 # Move pacman state from /var -> /usr/lib/sysimage
 RUN <<'EORUN'
@@ -124,6 +124,13 @@ RUN bootc container lint
 
 LABEL containers.bootc="1"
 LABEL ostree.bootable="1"
+LABEL org.opencontainers.image.title="Arch Linux Bootc Base"
+LABEL org.opencontainers.image.description="Minimal bootc-compatible base image built on Arch Linux"
+LABEL org.opencontainers.image.version="TEMPLATE_VERSION"
+LABEL org.opencontainers.image.revision="TEMPLATE_REVISION"
+LABEL org.opencontainers.image.created="TEMPLATE_CREATED"
+LABEL org.opencontainers.image.source="https://github.com/Shandoo94/bootc-arch-base"
+
 ENV container=oci
 STOPSIGNAL SIGRTMIN+3
 CMD ["/sbin/init"]

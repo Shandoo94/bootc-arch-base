@@ -6,7 +6,16 @@ A minimal bootc-compatible base image built on top of the official Arch Linux co
 
 ### Build the base image
 
+Using the Makefile (recommended):
+
 ```bash
+make build
+```
+
+Or manually:
+
+```bash
+./scripts/make-containerfile.sh  # Generate Containerfile from template
 podman build -t bootc-arch-base .
 ```
 
@@ -35,8 +44,20 @@ podman run --rm -it bootc-arch-base /bin/bash
 
 - **Two-stage build**: Modifies the rootfs in stage 1, copies to `FROM scratch` in stage 2 to minimize size.
 - **In-place modification**: Uses official `archlinux@sha256:...` as base. Uses digests instead of tags to ensure immutability.
+- **Template-based**: `Containerfile.template` is processed to inject version metadata and base image reference.
 - **Bootc-compliant layout**: 
   - Mutable data in `/var`
   - Immutable system in `/usr`
   - Pacman state in `/usr/lib/sysimage`
   - Initramfs at `/usr/lib/modules/$kver/initramfs.img`
+
+## Build System
+
+The build process uses a template system similar to the official Arch Linux container image:
+
+1. **Containerfile.template**: Contains `TEMPLATE_*` placeholders for dynamic values
+2. **scripts/make-containerfile.sh**: Generates `Containerfile` from template with version/metadata
+3. **Makefile**: Provides convenient build targets for local development
+4. **GitHub Actions**: Automated builds with version tagging (`YYYYMMDD.BUILD_NUMBER`)
+
+The base image reference from `base-image.lock` is automatically injected during build.

@@ -1,0 +1,51 @@
+name: Bump Base Digest
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC (adjust)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install skopeo + jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo jq
+
+      - name: Resolve newest base-* and digest
+        id: resolve
+        run: |
+          REPO="docker.io/archlinux/archlinux"
+
+          latest_tag="$(skopeo list-tags docker://$REPO | jq -r '.Tags[]' | grep '^base-[0-9]' | sort -V | tail -1)"
+          echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+
+          digest="$(skopeo inspect --format '{{.Digest}}' docker://$REPO:$latest_tag)"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+          echo "new_ref=$REPO:$latest_tag@$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Update lockfile
+        run: |
+          echo "${{ steps.resolve.outputs.new_ref }}" > base-image.lock
+
+      - name: Create PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore(deps): bump arch base to ${{ steps.resolve.outputs.latest_tag }}"
+          title: "chore(deps): bump arch base to ${{ steps.resolve.outputs.latest_tag }}"
+          body: |
+            Updates pinned Arch base image:
+            - Tag: `${{ steps.resolve.outputs.latest_tag }}`
+            - Digest: `${{ steps.resolve.outputs.digest }}`
+          branch: chore/bump-base-image-version
+          delete-branch: true
+          force: false
