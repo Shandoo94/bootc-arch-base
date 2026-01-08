@@ -2,22 +2,8 @@
 FROM TEMPLATE_BASE_IMAGE_REF AS builder
 
 # Move pacman state from /var -> /usr/lib/sysimage
-RUN <<'EORUN'
-set -euo pipefail
-grep "= */var" "/etc/pacman.conf" | \
-  sed "/= *\/var/s/.*=// ; s/ //" | \
-  while read -r varpath; do
-    newpath="/usr/lib/sysimage/${varpath#/var/}"
-    mkdir -p "$(dirname "${newpath}")"
-    mv -v "${varpath}" "${newpath}"
-  done
-
-sed -i \
-  -e "/= *\/var/ s/^#//" \
-  -e "s@= */var@= /usr/lib/sysimage@g" \
-  -e "/DownloadUser/d" \
-  "/etc/pacman.conf"
-EORUN
+RUN grep "= */var" "/etc/pacman.conf" | sed "/= *\/var/s/.*=// ; s/ //" | while read -r varpath; do newpath="/usr/lib/sysimage/${varpath#/var/}"; mkdir -p "$(dirname "${newpath}")"; mv -v "${varpath}" "${newpath}"; done && \
+sed -i -e "/= *\/var/ s/^#//" -e "s@= */var@= /usr/lib/sysimage@g" -e "/DownloadUser/d" "/etc/pacman.conf"
 
 # Make system update
 RUN pacman -Syu --noconfirm
@@ -55,35 +41,21 @@ dracut --force "/usr/lib/modules/${kver}/initramfs.img"
 RUN pacman -Scc --noconfirm
 
 # Mutate file tree to comply to image-based systems
-RUN <<'EORUN'
-set -euo pipefail
+RUN sed -i "s|^HOME=.*|HOME=/var/home|" "/etc/default/useradd" || true && \
+rm -rf /boot /home /root /usr/local /srv /opt /mnt /var /usr/lib/sysimage/log /usr/lib/sysimage/cache/pacman/pkg && \
+mkdir -p /sysroot /boot /usr/lib/ostree /var
 
-# New users should get /var/home
-sed -i "s|^HOME=.*|HOME=/var/home|" "/etc/default/useradd" || true
-
-# Remove top-level dirs that we will recreate via symlinks
-rm -rf /{boot,home,root,usr/local,srv,var,usr/lib/sysimage/log,usr/lib/sysimage/cache/pacman/pkg}
-mkdir -p /{sysroot,boot,usr/lib/ostree,var}
-
-# Symlink layout (mutable bits into /var)
-ln -s sysroot/ostree "/ostree"
-ln -s var/roothome "/root"
-ln -s var/srv "/srv"
-ln -s var/opt "/opt"
-ln -s var/mnt "/mnt"
+RUN ln -s sysroot/ostree "/ostree" && \
+ln -s var/roothome "/root" && \
+ln -s var/srv "/srv" && \
+ln -s var/opt "/opt" && \
+ln -s var/mnt "/mnt" && \
 ln -s var/home "/home"
 
-# Tmpfiles rules to create the /var subdirs on boot
-mkdir -p "/usr/lib/tmpfiles.d"
-{
-  for dir in opt home srv mnt usrlocal; do
-    echo "d /var/${dir} 0755 root root -"
-  done
-  echo "d /var/roothome 0700 root root -"
-  echo "d /run/media 0755 root root -"
-} > "/usr/lib/tmpfiles.d/bootc-base-dirs.conf"
-
-EORUN
+RUN mkdir -p "/usr/lib/tmpfiles.d" && \
+{ for dir in opt home srv mnt usrlocal; do echo "d /var/${dir} 0755 root root -"; done && \
+echo "d /var/roothome 0700 root root -" && \
+echo "d /run/media 0755 root root -"; } > "/usr/lib/tmpfiles.d/bootc-base-dirs.conf"
 
 # Stage 2: final OS image
 FROM scratch
