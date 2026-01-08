@@ -20,69 +20,39 @@ sed -i \
 EORUN
 
 # Make system update
-RUN <<'EORUN'
-set -euo pipefail
-pacman -Syu --noconfirm
-pacman -S --clean --noconfirm
-EORUN
+RUN pacman -Syu --noconfirm
 
 # Install packages
-RUN <<'EORUN'
-set -euo pipefail
-pacman -Sy --noconfirm base linux linux-firmware dbus dbus-glib glib2 skopeo dracut ostree shadow btrfs-progs e2fsprogs xfsprogs dosfstools
+RUN pacman -Sy --noconfirm base linux linux-firmware dbus dbus-glib glib2 skopeo dracut ostree shadow btrfs-progs e2fsprogs xfsprogs dosfstools && \
 pacman -S --clean --noconfirm
-EORUN
 
 # Install bootc from source
-RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root <<'EORUN'
-set -euo pipefail
-pacman -S --noconfirm make git rust go-md2man
-git clone --branch v1.11.0 --depth 1 "https://github.com/bootc-dev/bootc.git" /tmp/bootc
-make -C /tmp/bootc bin install-all
-pacman -Rns --noconfirm make git rust go-md2man
+RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root \
+set -euo pipefail && \
+pacman -S --noconfirm make git rust go-md2man && \
+git clone --branch v1.11.0 --depth 1 "https://github.com/bootc-dev/bootc.git" /tmp/bootc && \
+make -C /tmp/bootc bin install-all && \
+pacman -Rns --noconfirm make git rust go-md2man && \
 pacman -S --clean --noconfirm
-EORUN
 
-# Write configs
-RUN <<'EORUN'
-set -euo pipefail
+## Write configs
 
 # Enable composefs backend and readonly sysroot via ostree-prepare-root
 # This file must exist before initramfs generation
-mkdir -p /usr/lib/ostree
-cat > "/usr/lib/ostree/prepare-root.conf" <<EOF
-[composefs]
-enabled = true
-[sysroot]
-readonly = true
-EOF
-EORUN
+RUN mkdir -p /usr/lib/ostree
+COPY ./configs/ostree/prepare-root.conf /usr/lib/ostree/prepare-root.conf
 
 # initramfs
-RUN <<'EORUN'
-set -euo pipefail
-
 # https://github.com/bootc-dev/bootc/issues/1801
-cat > "/usr/lib/dracut/dracut.conf.d/30-bootcrew-fix-bootc-module.conf" <<'EOF'
-systemdsystemconfdir=/etc/systemd/system
-systemdsystemunitdir=/usr/lib/systemd/system
-EOF
+COPY ./configs/dracut/30-bootcrew-fix-bootc-module.conf /usr/lib/dracut/dracut.conf.d/30-bootcrew-fix-bootc-module.conf
 
-cat > "/usr/lib/dracut/dracut.conf.d/30-bootcrew-bootc-container-build.conf" <<'EOF'
-reproducible=yes
-hostonly=no
-compress=zstd
-add_dracutmodules+=" ostree bootc "
-EOF
+COPY ./configs/dracut/30-bootcrew-bootc-container-build.conf /usr/lib/dracut/dracut.conf.d/30-bootcrew-bootc-container-build.conf
 
-kver=$(ls /usr/lib/modules/ | grep -v '^\.' | sort -V | tail -n1)
+RUN kver=$(ls /usr/lib/modules/ | grep -v '^\.' | sort -V | tail -n1) && \
 dracut --force "/usr/lib/modules/${kver}/initramfs.img"
-EORUN
 
 # Final cleanup
-RUN <<'EORUN'
-pacman -Scc --noconfirm
-EORUN
+RUN pacman -Scc --noconfirm
 
 # Mutate file tree to comply to image-based systems
 RUN <<'EORUN'
