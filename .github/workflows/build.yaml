@@ -2,22 +2,29 @@ name: Build Image
 
 on:
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
-      - 'Containerfile.template'
-      - 'base-image.lock'
-      - 'scripts/**'
-      - 'Makefile'
-      - '.github/workflows/build.yaml'
+      - "Containerfile.template"
+      - "base-image.lock"
+      - "scripts/**"
+      - "Makefile"
+      - ".github/workflows/build.yaml"
   push:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
 
 jobs:
   build:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+
+      # Based on https://github.com/orgs/community/discussions/25678
+      - name: Delete huge unnecessary tools folder
+        run: rm -rf /opt/hostedtoolcache
 
       - name: Generate build version
         id: version
@@ -49,22 +56,78 @@ jobs:
           path: Containerfile
           retention-days: 30
 
-      - name: Build bootc image
-        run: |
-          podman build \
-            -t bootc-arch-base:${{ steps.version.outputs.version }} \
-            -t bootc-arch-base:latest \
-            .
+      - name: Build image
+        id: build-image
+        uses: redhat-actions/buildah-build@v2
+        with:
+          image: ${{ env.IMAGE_NAME }}
+          tags: ${{ steps.version.outputs.version }} latest
+          containerfiles: |
+            ./Containerfile
+          oci: true
+          layers: true
+          extra-args: |
+            --pull-always
 
-      - name: Inspect image
+  publish:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # Based on https://github.com/orgs/community/discussions/25678
+      - name: Delete huge unnecessary tools folder
+        run: rm -rf /opt/hostedtoolcache
+
+      - name: Generate build version
+        id: version
         run: |
-          echo "=== Image Tags ==="
-          podman images bootc-arch-base
-          echo ""
-          echo "=== Image Details ==="
-          podman inspect bootc-arch-base:${{ steps.version.outputs.version }} | \
-            jq '.[0] | {
-              Size: .Size,
-              Created: .Created,
-              Labels: .Labels
-            }'
+          BUILD_DATE=$(date +%Y%m%d)
+          BUILD_NUMBER=${{ github.run_number }}
+          VERSION="${BUILD_DATE}.${BUILD_NUMBER}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version: $VERSION"
+
+      - name: Read base image ref
+        id: base-image
+        run: |
+          BASE_IMAGE_REF=$(head -n1 base-image.lock | tr -d '[:space:]')
+          echo "ref=$BASE_IMAGE_REF" >> "$GITHUB_OUTPUT"
+          echo "Base image: $BASE_IMAGE_REF"
+
+      - name: Generate Containerfile
+        run: |
+          BUILD_VERSION="${{ steps.version.outputs.version }}" \
+          GIT_SHA="${{ github.sha }}" \
+          BASE_IMAGE_REF="${{ steps.base-image.outputs.ref }}" \
+          ./scripts/make-containerfile.sh
+
+      - name: Build image
+        id: build-image
+        uses: redhat-actions/buildah-build@v2
+        with:
+          image: ${{ env.IMAGE_NAME }}
+          tags: ${{ steps.version.outputs.version }} latest
+          containerfiles: |
+            ./Containerfile
+          oci: true
+          layers: true
+          extra-args: |
+            --pull-always
+
+      - name: Log in to GHCR
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push to GHCR
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: ${{ steps.build-image.outputs.image }}
+          tags: ${{ steps.build-image.outputs.tags }}
+          registry: ${{ env.REGISTRY }}/${{ env.GHCR_NAMESPACE }}
