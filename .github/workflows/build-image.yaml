@@ -16,6 +16,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Toolchain Versions
+        run: |
+          podman --version || true
+          buildah --version || true
+
       # Based on https://github.com/orgs/community/discussions/25678
       - name: Delete huge unnecessary tools folder
         run: rm -rf /opt/hostedtoolcache
