@@ -1,0 +1,15 @@
+name: Validate PR
+
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-image.yaml
+    with:
+      push: false
+      image_name: bootc-arch-base
