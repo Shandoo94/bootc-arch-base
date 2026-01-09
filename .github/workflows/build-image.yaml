@@ -1,0 +1,85 @@
+name: build image
+
+on:
+  workflow_call:
+    inputs:
+      push:
+        required: true
+        type: boolean
+      image_name:
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain Versions
+        run: |
+          podman --version || true
+          buildah --version || true
+
+      # Based on https://github.com/orgs/community/discussions/25678
+      - name: Delete huge unnecessary tools folder
+        run: rm -rf /opt/hostedtoolcache
+
+      - name: Generate build version
+        id: version
+        run: |
+          BUILD_DATE=$(date +%Y%m%d)
+          BUILD_NUMBER=${{ github.run_number }}
+          echo "version=${BUILD_DATE}.${BUILD_NUMBER}" >> "$GITHUB_OUTPUT"
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "namespace=$OWNER" >> "$GITHUB_OUTPUT"
+
+      - name: Read base image ref
+        id: base-image
+        run: |
+          BASE_IMAGE_REF=$(head -n1 base-image.lock | tr -d '[:space:]')
+          echo "ref=$BASE_IMAGE_REF" >> "$GITHUB_OUTPUT"
+
+      - name: Generate Containerfile
+        run: |
+          BUILD_VERSION="${{ steps.version.outputs.version }}" \
+          GIT_SHA="${{ github.sha }}" \
+          BASE_IMAGE_REF="${{ steps.base-image.outputs.ref }}" \
+          ./scripts/make-containerfile.sh
+
+      - name: Scan repo for secrets
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          scanners: "secret"
+          exit-code: "1"
+
+      - name: Build image
+        id: build-image
+        uses: redhat-actions/buildah-build@v2
+        with:
+          image: ${{ inputs.image_name }}
+          tags: ${{ steps.version.outputs.version }} latest
+          containerfiles: |
+            ./Containerfile
+          oci: true
+          layers: true
+          extra-args: |
+            --pull-always
+
+      - name: Log in to GHCR
+        if: inputs.push
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push to GHCR
+        if: inputs.push
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: ${{ steps.build-image.outputs.image }}
+          tags: ${{ steps.build-image.outputs.tags }}
+          registry: ghcr.io/${{ steps.version.outputs.namespace }}
