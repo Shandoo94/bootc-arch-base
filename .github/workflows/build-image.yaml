@@ -66,6 +66,9 @@ jobs:
           extra-args: |
             --pull-always
 
+      - name: Enable Podman socket for Trivy
+        run: systemctl start podman.socket
+
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.33.1
         with:
