@@ -5,6 +5,10 @@ on:
     - cron: "0 6 * * 1" # Mondays 06:00 UTC (adjust)
   workflow_dispatch:
 
+concurrency:
+  group: bump-base-digest
+  cancel-in-progress: false
+
 permissions:
   contents: write
   pull-requests: write
@@ -23,19 +27,49 @@ jobs:
       - name: Resolve newest base-* and digest
         id: resolve
         run: |
-          REPO="docker.io/archlinux/archlinux"
+          set -euo pipefail
 
-          latest_tag="$(skopeo list-tags docker://$REPO | jq -r '.Tags[]' | grep '^base-[0-9]' | sort -V | tail -1)"
-          echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
+          REPO="docker.io/library/archlinux"
+
+          latest_tag="$(skopeo list-tags docker://$REPO \
+            | jq -r '.Tags[]' \
+            | grep '^base-[0-9]' \
+            | sort -V \
+            | tail -1)"
+
+          if [ -z "$latest_tag" ]; then
+            echo "No base-* tags found for $REPO" >&2
+            exit 1
+          fi
 
           digest="$(skopeo inspect --format '{{.Digest}}' docker://$REPO:$latest_tag)"
+          media="$(skopeo inspect --format '{{.MediaType}}' docker://$REPO:$latest_tag)"
+
+          # Sanity: ensure digest is actually retrievable
+          skopeo inspect "docker://$REPO@$digest" >/dev/null
+
+          echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "mediaType=$media" >> "$GITHUB_OUTPUT"
+          echo "new_ref=$REPO@$digest" >> "$GITHUB_OUTPUT"
 
-          echo "new_ref=$REPO:$latest_tag@$digest" >> "$GITHUB_OUTPUT"
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
 
-      - name: Update lockfile
+      - name: Verify signature
+        run: cosign verify "${{ steps.resolve.outputs.new_ref }}" --certificate-identity-regexp="https://gitlab\.archlinux\.org/archlinux/archlinux-docker//\.gitlab-ci\.yml@refs/tags/v[0-9]+\.0\.[0-9]+" --certificate-oidc-issuer=https://gitlab.archlinux
+
+      - name: Update lockfile (only if changed)
         run: |
-          echo "${{ steps.resolve.outputs.new_ref }}" > base-image.lock
+          new="${{ steps.resolve.outputs.new_ref }}"
+          old="$(cat base-image.lock 2>/dev/null || true)"
+
+          if [ "$new" = "$old" ]; then
+            echo "base-image.lock already up to date: $new"
+            exit 0
+          fi
+
+          echo "$new" > base-image.lock
 
       - name: Create PR
         uses: peter-evans/create-pull-request@v6
