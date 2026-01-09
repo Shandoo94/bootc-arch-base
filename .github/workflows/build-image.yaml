@@ -67,7 +67,7 @@ jobs:
             --pull-always
 
       - name: Save image for Trivy
-        run: podman save -o image.tar --format oci-archive localhost/"${{ inputs.image_name }}:${{ steps.version.outputs.version }}"
+        run: podman save -o image.tar --format docker-archive localhost/"${{ inputs.image_name }}:${{ steps.version.outputs.version }}"
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.33.1
