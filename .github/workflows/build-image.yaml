@@ -66,18 +66,20 @@ jobs:
           extra-args: |
             --pull-always
 
-      - name: Save image for Trivy
-        run: podman save -o image.tar --format docker-archive localhost/"${{ inputs.image_name }}:${{ steps.version.outputs.version }}"
+      - name: Install Trivy
+        uses: aquasecurity/setup-trivy@v0.2.4
+        with:
+          cache: true
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.33.1
-        with:
-          input: "image.tar"
-          format: "table"
-          exit-code: "1"
-          ignore-unfixed: true
-          vuln-type: "os,library"
-          severity: "CRITICAL"
+        run: |
+          trivy image \
+            --format table \
+            --exit-code 1 \
+            --ignore-unfixed \
+            --vuln-type os,library \
+            --severity CRITICAL \
+            "containers-storage:${{ inputs.image_name }}:${{ steps.version.outputs.version }}"
 
       - name: Log in to GHCR
         if: inputs.push
