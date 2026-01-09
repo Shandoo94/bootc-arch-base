@@ -66,19 +66,18 @@ jobs:
           extra-args: |
             --pull-always
 
-      - name: Enable Podman socket for Trivy
-        run: sudo systemctl start podman.socket
+      - name: Save image for Trivy
+        run: podman save -o image.tar --format oci-archive localhost/"${{ inputs.image_name }}:${{ steps.version.outputs.version }}"
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.33.1
         with:
-          image-ref: "containers-storage:${{ inputs.image_name }}:${{ steps.version.outputs.version }}"
+          input: "image.tar"
           format: "table"
           exit-code: "1"
           ignore-unfixed: true
           vuln-type: "os,library"
           severity: "CRITICAL,HIGH"
-          docker-host: unix://run/podman/podman.sock
 
       - name: Log in to GHCR
         if: inputs.push
