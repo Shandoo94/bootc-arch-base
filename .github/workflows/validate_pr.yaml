@@ -3,14 +3,6 @@ name: Validate PR
 on:
   pull_request:
     branches: [master]
-    paths:
-      - "Containerfile.template"
-      - "base-image.lock"
-      - "scripts/**"
-      - "configs/**"
-      - "Makefile"
-      - ".github/workflows/build-image.yaml"
-      - ".github/workflows/validate_pr.yaml"
 
 permissions:
   contents: read
