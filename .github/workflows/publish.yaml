@@ -1,0 +1,17 @@
+name: Publish
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    uses: ./.github/workflows/build-image.yaml
+    with:
+      push: true
+      image_name: bootc-arch-base
