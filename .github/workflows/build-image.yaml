@@ -45,6 +45,14 @@ jobs:
           BASE_IMAGE_REF="${{ steps.base-image.outputs.ref }}" \
           ./scripts/make-containerfile.sh
 
+      - name: Scan repo for secrets
+        uses: aquasecurity/trivy-action@v0.33.1
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          scanners: "secret"
+          exit-code: "1"
+
       - name: Build image
         id: build-image
         uses: redhat-actions/buildah-build@v2
@@ -57,6 +65,16 @@ jobs:
           layers: true
           extra-args: |
             --pull-always
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: "containers-storage:${{ inputs.image_name }}:${{ steps.version.outputs.version }}"
+          format: "table"
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH"
 
       - name: Log in to GHCR
         if: inputs.push
