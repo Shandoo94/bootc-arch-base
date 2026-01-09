@@ -75,6 +75,7 @@ jobs:
           ignore-unfixed: true
           vuln-type: "os,library"
           severity: "CRITICAL,HIGH"
+          docker-host: unix://run/podman/podman.sock
 
       - name: Log in to GHCR
         if: inputs.push
