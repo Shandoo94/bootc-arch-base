@@ -61,3 +61,7 @@ The build process uses a template system similar to the official Arch Linux cont
 4. **GitHub Actions**: Automated builds with version tagging (`YYYYMMDD.BUILD_NUMBER`)
 
 The base image reference from `base-image.lock` is automatically injected during build.
+
+## Credits
+
+- [bootcrew](https://github.com/bootcrew): This project closely uses the bootcrew project as reference.
