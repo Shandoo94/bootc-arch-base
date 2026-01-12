@@ -3,6 +3,11 @@ name: Publish
 on:
   push:
     branches: [master]
+    paths:
+      - "configs/**"
+      - "scripts/**"
+      - "Containerfile.template"
+      - "base-image.lock"
   workflow_dispatch:
 
 permissions:
