@@ -16,7 +16,7 @@ pacman -S --clean --noconfirm
 RUN --mount=type=tmpfs,dst=/tmp --mount=type=tmpfs,dst=/root \
 set -euo pipefail && \
 pacman -S --noconfirm make git rust go-md2man && \
-git clone --branch v1.12.0 --depth 1 "https://github.com/bootc-dev/bootc.git" /tmp/bootc && \
+git clone --branch v1.12.1 --depth 1 "https://github.com/bootc-dev/bootc.git" /tmp/bootc && \
 make -C /tmp/bootc bin install-all && \
 pacman -Rns --noconfirm make git rust go-md2man && \
 pacman -S --clean --noconfirm
