@@ -64,14 +64,14 @@ COPY --from=builder / /
 # Final sanity check
 RUN bootc container lint
 
-LABEL containers.bootc="1"
-LABEL ostree.bootable="1"
-LABEL org.opencontainers.image.title="Arch Linux Bootc Base"
-LABEL org.opencontainers.image.description="Minimal bootc-compatible base image built on Arch Linux"
-LABEL org.opencontainers.image.version="TEMPLATE_VERSION"
-LABEL org.opencontainers.image.revision="TEMPLATE_REVISION"
-LABEL org.opencontainers.image.created="TEMPLATE_CREATED"
-LABEL org.opencontainers.image.source="https://github.com/Shandoo94/bootc-arch-base"
+LABEL containers.bootc 1
+LABEL ostree.bootable 1
+LABEL org.opencontainers.image.title "Arch Linux Bootc Base"
+LABEL org.opencontainers.image.description "Minimal bootc-compatible base image built on Arch Linux"
+LABEL org.opencontainers.image.version "TEMPLATE_VERSION"
+LABEL org.opencontainers.image.revision "TEMPLATE_REVISION"
+LABEL org.opencontainers.image.created "TEMPLATE_CREATED"
+LABEL org.opencontainers.image.source "https://github.com/Shandoo94/bootc-arch-base"
 
 ENV container=oci
 STOPSIGNAL SIGRTMIN+3
