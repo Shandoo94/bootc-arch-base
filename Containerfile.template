@@ -9,7 +9,7 @@ sed -i -e "/= *\/var/ s/^#//" -e "s@= */var@= /usr/lib/sysimage@g" -e "/Download
 RUN pacman -Syu --noconfirm
 
 # Install packages
-RUN pacman -Sy --noconfirm base linux linux-firmware dbus dbus-glib glib2 skopeo dracut ostree shadow btrfs-progs e2fsprogs xfsprogs dosfstools && \
+RUN pacman -Sy --noconfirm base linux linux-firmware dbus dbus-glib glib2 skopeo dracut cpio ostree shadow btrfs-progs e2fsprogs xfsprogs dosfstools && \
 pacman -S --clean --noconfirm
 
 # Install bootc from source
