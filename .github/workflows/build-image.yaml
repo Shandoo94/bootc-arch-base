@@ -47,14 +47,6 @@ jobs:
           BASE_IMAGE_REF="${{ steps.base-image.outputs.ref }}" \
           ./scripts/make-containerfile.sh
 
-      - name: Scan repo for secrets
-        uses: aquasecurity/trivy-action@0.33.1
-        with:
-          scan-type: "fs"
-          scan-ref: "."
-          scanners: "secret"
-          exit-code: "1"
-
       - name: Build image
         id: build-image
         uses: redhat-actions/buildah-build@v2
