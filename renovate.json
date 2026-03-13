@@ -1,0 +1,39 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": [
+        "^base-image\\.lock$"
+      ],
+      "matchStrings": [
+        "(?<depName>[^:]+):(?<currentValue>[^@]+)@(?<currentDigest>sha256:[a-f0-9]+)"
+      ],
+      "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": [
+        "^Containerfile\\.template$"
+      ],
+      "matchStrings": [
+        "git clone --branch (?<currentValue>v[0-9\\.]+) --depth 1 .https:..github\\.com.(?<depName>.+?)\\.git"
+      ],
+      "datasourceTemplate": "github-tags",
+      "extractVersionTemplate": "^(?<version>.*)$"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchPackageNames": [
+        "archlinux",
+        "archlinux/archlinux",
+        "docker.io/archlinux/archlinux"
+      ],
+      "versioning": "regex:(?<compatibility>base-)(?<major>[0-9]+).(?<minor>0).(?<patch>[0-9]+)$"
+    }
+  ]
+}
