@@ -20,7 +20,7 @@
         "^Containerfile\\.template$"
       ],
       "matchStrings": [
-        "git clone --branch (?<currentValue>v[0-9\\.]+) --depth 1 .(?<depName>https:..github\\.com.+?)\\.git"
+        "git clone --branch (?<currentValue>v[0-9\\.]+) --depth 1 .https:..(?<depName>github\\.com.+?)\\.git"
       ],
       "datasourceTemplate": "github-tags",
       "extractVersionTemplate": "^(?<version>.*)$"
