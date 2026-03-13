@@ -1,0 +1,25 @@
+name: Verify Base Digest Signature
+
+on:
+  pull_request:
+    paths:
+      - "base-image.lock"
+
+jobs:
+  verify-signature:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Read new reference
+        id: read_ref
+        run: |
+          # Extract the full reference from the lock file
+          NEW_REF=$(cat base-image.lock)
+          echo "new_ref=$NEW_REF" >> "$GITHUB_OUTPUT"
+
+      - name: Verify signature
+        run: cosign verify "${{ steps.read_ref.outputs.new_ref }}" --certificate-identity-regexp="https://gitlab\.archlinux\.org/archlinux/archlinux-docker//\.gitlab-ci\.yml@refs/tags/v[0-9]+\.0\.[0-9]+" --certificate-oidc-issuer=https://gitlab.archlinux.org

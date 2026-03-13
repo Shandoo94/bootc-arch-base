@@ -2,5 +2,25 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": [
+        "^base-image\\.lock$"
+      ],
+      "matchStrings": [
+        "^(?<depName>[^:]+):(?<currentValue>[^@]+)@(?<currentDigest>sha256:[a-f0-9]+)$"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchPackageNames": [
+        "docker.io/archlinux/archlinux"
+      ],
+      "versioning": "regex:^(?<compatibility>base-)(?<major>\\d{4})(?<minor>\\d{2})(?<patch>\\d{2})\\.(?<build>\\d+)$"
+    }
   ]
 }
