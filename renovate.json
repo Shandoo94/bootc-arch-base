@@ -10,7 +10,7 @@
         "^base-image\\.lock$"
       ],
       "matchStrings": [
-        "^(?<depName>[^:]+):(?<currentValue>[^@]+)@(?<currentDigest>sha256:[a-f0-9]+)$"
+        "(?<depName>[^:]+):(?<currentValue>[^@]+)@(?<currentDigest>sha256:[a-f0-9]+)"
       ],
       "datasourceTemplate": "docker"
     }
