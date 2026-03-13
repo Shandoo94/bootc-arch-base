@@ -13,6 +13,18 @@
         "(?<depName>[^:]+):(?<currentValue>[^@]+)@(?<currentDigest>sha256:[a-f0-9]+)"
       ],
       "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": [
+        "^Containerfile$",
+        "^Dockerfile$"
+      ],
+      "matchStrings": [
+        "git clone --branch (?<currentValue>v[0-9\\.]+) --depth 1 .(?<depName>https:..github\\.com.+?)\\.git"
+      ],
+      "datasourceTemplate": "github-tags",
+      "extractVersionTemplate": "^(?<version>.*)$"
     }
   ],
   "packageRules": [
