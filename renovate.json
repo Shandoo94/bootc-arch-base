@@ -18,9 +18,11 @@
   "packageRules": [
     {
       "matchPackageNames": [
+        "archlinux",
+        "archlinux/archlinux",
         "docker.io/archlinux/archlinux"
       ],
-      "versioning": "regex:^(?<compatibility>base-)(?<major>\\d{4})(?<minor>\\d{2})(?<patch>\\d{2})\\.(?<build>\\d+)$"
+      "versioning": "regex:(?<compatibility>base-)(?<major>[0-9]+).(?<minor>0).(?<patch>[0-9]+)$/gm"
     }
   ]
 }
