@@ -22,7 +22,7 @@
         "archlinux/archlinux",
         "docker.io/archlinux/archlinux"
       ],
-      "versioning": "regex:(?<compatibility>base-)(?<major>[0-9]+).(?<minor>0).(?<patch>[0-9]+)$/gm"
+      "versioning": "regex:(?<compatibility>base-)(?<major>[0-9]+).(?<minor>0).(?<patch>[0-9]+)$"
     }
   ]
 }
